@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% block title %}CampusQ | Full-Screen Queue Display{% endblock %}
+{% block content %}
+<style>
+  .cq-screen { min-height: calc(100vh - 150px); }
+  .cq-hero { background: radial-gradient(circle at 10% 5%,rgba(124,58,237,.24),transparent 35%),linear-gradient(135deg,#111827,#0b1b2a);border:1px solid #2b3a52;border-radius:24px;padding:clamp(20px,4vw,48px); }
+  .cq-current { font-size:clamp(4rem,13vw,10rem);line-height:1;font-weight:850;letter-spacing:-.055em;color:#67e8f9;text-shadow:0 0 34px rgba(34,211,238,.15); }
+  .cq-next { background:#101b2d;border:1px solid #334155;border-radius:18px;padding:20px;text-align:center;min-height:118px; }
+  .cq-next-number {font-size:clamp(1.6rem,4vw,3rem);font-weight:800;color:#fff}
+  body.cq-fullscreen main.container {max-width:none!important;width:100%!important;padding:22px!important}
+  body.cq-fullscreen footer,body.cq-fullscreen nav {display:none!important}
+  body.cq-fullscreen .cq-screen {min-height:calc(100vh - 44px)}
+  body.cq-fullscreen .cq-hero {min-height:calc(100vh - 90px);display:flex;flex-direction:column;justify-content:space-between}
+</style>
+<div class="cq-screen">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+    <div><div class="small text-uppercase text-info fw-semibold">CampusQ • Public monitor</div>
+      <h1 class="display-5 fw-bold mb-1">Live Queue Display</h1>
+      <p class="text-secondary mb-0">Live token calls for campus services</p></div>
+    <div class="d-flex flex-wrap align-items-end gap-2">
+      {% if selected_service %}<div style="min-width:230px">
+        <label for="service-select" class="form-label">Department</label>
+        <select id="service-select" class="form-select">
+        {% for service in services %}<option value="{{ service.id }}" {% if selected_service.id == service.id %}selected{% endif %}>{{ service.name }}</option>{% endfor %}
+        </select></div>{% endif %}
+      <button id="fullscreen-btn" type="button" class="btn btn-primary">⛶ Full screen</button>
+    </div>
+  </div>
+  {% if selected_service %}
+  <section class="cq-hero">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <span class="badge text-bg-primary px-3 py-2">● LIVE · AUTO REFRESH</span>
+      <div class="text-end"><div class="fs-5 fw-semibold" id="live-clock">--:--:--</div><div class="small text-secondary" id="live-date"></div></div>
+    </div>
+    <div class="text-center py-4 py-lg-5">
+      <div class="text-secondary text-uppercase fw-semibold mb-3" style="letter-spacing:.18em">Now serving · {{ selected_service.name }}</div>
+      <div id="serving-token" class="cq-current">---</div>
+      <div class="fs-5 text-secondary mt-3" id="serving-note">Waiting for the next token to be called</div>
+      <div class="mt-3"><span class="badge rounded-pill text-bg-info fs-6 px-3 py-2" id="serving-counter">Counter —</span></div>
+    </div>
+    <div class="border-top pt-4" style="border-color:#334155!important">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h3 mb-0">Up next</h2><span class="badge text-bg-info"><span id="waiting-count">0</span> waiting</span>
+      </div>
+      <div id="waiting-list" class="row g-3">
+        {% for i in "123" %}<div class="col-12 col-md-4"><div class="cq-next"><div class="small text-secondary">NEXT {{ forloop.counter }}</div><div class="cq-next-number">---</div></div></div>{% endfor %}
+      </div>
+    </div>
+    <div class="d-flex justify-content-between flex-wrap gap-2 mt-4 small text-secondary">
+      <span>Please proceed to the counter only when your token is called.</span>
+      <span>Last updated: <span id="updated-at">--:--:--</span> · Refreshes every 5 seconds</span>
+    </div>
+  </section>
+  {% else %}
+  <div class="card p-5 text-center"><h2 class="h4">No services available</h2><p class="text-secondary mb-0">Ask an administrator to add an active service.</p></div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block extra_scripts %}
+{% if selected_service %}
+<script>
+(() => {
+  const select = document.getElementById("service-select");
+  const serving = document.getElementById("serving-token");
+  const note = document.getElementById("serving-note");
+  const counter = document.getElementById("serving-counter");
+  const list = document.getElementById("waiting-list");
+  const count = document.getElementById("waiting-count");
+  const updated = document.getElementById("updated-at");
+  const fullBtn = document.getElementById("fullscreen-btn");
+  const clock = document.getElementById("live-clock");
+  const date = document.getElementById("live-date");
+
+  function updateClock() {
+    const now = new Date();
+    clock.textContent = now.toLocaleTimeString();
+    date.textContent = now.toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+  }
+
+  function showWaiting(tokens) {
+    list.replaceChildren();
+    for (let i=0;i<3;i++) {
+      const col=document.createElement("div"); col.className="col-12 col-md-4";
+      const card=document.createElement("div"); card.className="cq-next";
+      const label=document.createElement("div"); label.className="small text-secondary"; label.textContent="NEXT "+(i+1);
+      const number=document.createElement("div"); number.className="cq-next-number"; number.textContent=tokens[i] || "—";
+      card.append(label,number); col.appendChild(card); list.appendChild(col);
+    }
+  }
+
+  async function refresh() {
+    try {
+      const response=await fetch("{% url 'live_display_api' %}?service="+encodeURIComponent(select.value),{cache:"no-store"});
+      if(!response.ok) throw new Error("Queue unavailable");
+      const data=await response.json();
+      serving.textContent=data.serving || "---";
+      note.textContent=data.serving ? "Please proceed to the service counter" : "Waiting for the next token to be called";
+      counter.textContent="Counter "+(data.serving_counter || "—");
+      count.textContent=data.waiting_count;
+      updated.textContent=data.updated_at;
+      showWaiting(data.waiting || []);
+    } catch(error) {
+      note.textContent="Reconnecting to queue…";
+    }
+  }
+
+  select.addEventListener("change",()=>{
+    const url=new URL(window.location.href);
+    url.searchParams.set("service",select.value);
+    window.location.href=url.toString();
+  });
+  fullBtn.addEventListener("click",async()=>{
+    try {
+      if(!document.fullscreenElement) await document.documentElement.requestFullscreen();
+      else await document.exitFullscreen();
+    } catch(error) { fullBtn.textContent="Full screen unavailable"; }
+  });
+  document.addEventListener("fullscreenchange",()=>{
+    const active=!!document.fullscreenElement;
+    document.body.classList.toggle("cq-fullscreen",active);
+    fullBtn.textContent=active?"⤢ Exit full screen":"⛶ Full screen";
+  });
+  updateClock(); refresh();
+  setInterval(refresh,5000); setInterval(updateClock,1000);
+})();
+</script>
+{% endif %}
+{% endblock %}

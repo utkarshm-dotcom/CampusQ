@@ -1,0 +1,134 @@
+{% extends 'base.html' %}{% block content %}
+<div class="row justify-content-center"><div class="col-md-7">
+<div class="card text-center shadow-sm"><div class="card-body p-5">
+<p class="text-secondary mb-1">{{ token.service.name }}</p>
+<h1 class="display-2 fw-bold text-primary" id="token-number">{{ token.token_number }}</h1>
+<span id="token-status" class="badge text-bg-info">{{ token.get_status_display }}</span>
+<hr>
+<div id="queue-info">
+{% if position == 0 %}<h2 class="h3">It's your turn!</h2>
+{% elif position %}<p class="text-secondary mt-3 mb-1">Your position in the waiting queue</p><div class="display-4 fw-bold" id="queue-position">{{ position }}</div>
+<p class="mt-3">Estimated wait: <strong><span id="waiting-minutes">{{ waiting_minutes }}</span> minutes</strong></p>
+{% else %}<p class="mt-3">This token is {{ token.get_status_display|lower }}.</p>{% endif %}
+</div>
+<div class="mt-3 d-flex flex-column align-items-center gap-2">
+  <button type="button" id="enable-notifications" class="btn btn-outline-info btn-sm">Enable browser notifications</button>
+  <span id="notification-help" class="small text-secondary" role="status" aria-live="polite">Keep this tracking page open to receive turn alerts.</span>
+</div>
+<p class="small text-secondary mt-3 mb-0">Live status refreshes automatically every 5 seconds · Last update: <span id="last-updated">just now</span></p>
+{% if token.status == "WAITING" %}
+<form method="post" action="{% url 'cancel_token' token.id %}" class="mt-3" onsubmit="return confirm('Cancel this waiting token?');">
+  {% csrf_token %}<button class="btn btn-outline-danger">Cancel token</button>
+</form>
+{% endif %}
+<a class="btn btn-outline-primary mt-3" href="{% url 'student_dashboard' %}">Back to dashboard</a>
+</div></div></div></div>
+<script>
+(() => {
+  const endpoint = "{% url 'token_status_api' token.id %}";
+  const statusEl = document.getElementById("token-status");
+  const infoEl = document.getElementById("queue-info");
+  const updatedEl = document.getElementById("last-updated");
+  const notifyButton = document.getElementById("enable-notifications");
+  const notifyHelp = document.getElementById("notification-help");
+  const tokenNumber = "{{ token.token_number|escapejs }}";
+  const initialStatus = "{{ token.status|escapejs }}";
+  let previousStatus = initialStatus;
+  let notificationPermission = ("Notification" in window) ? Notification.permission : "unsupported";
+
+  function updateNotificationControls() {
+    if (notificationPermission === "unsupported") {
+      notifyButton.hidden = true;
+      notifyHelp.textContent = "This browser does not support desktop notifications. Keep this page open to see live status updates.";
+    } else if (notificationPermission === "granted") {
+      notifyButton.hidden = true;
+      notifyHelp.textContent = "Browser notifications are enabled for this page.";
+    } else if (notificationPermission === "denied") {
+      notifyButton.disabled = true;
+      notifyButton.textContent = "Notifications blocked";
+      notifyHelp.textContent = "Notifications are blocked by your browser. Allow them for this site in browser site settings.";
+    } else {
+      notifyButton.hidden = false;
+      notifyHelp.textContent = "Enable alerts so CampusQ can notify you when your token is called.";
+    }
+  }
+
+  notifyButton.addEventListener("click", async () => {
+    if (!("Notification" in window)) return;
+    try {
+      notificationPermission = await Notification.requestPermission();
+      updateNotificationControls();
+      if (notificationPermission === "granted") {
+        new Notification("CampusQ notifications enabled", {
+          body: "We'll alert you when token " + tokenNumber + " is called.",
+          tag: "campusq-setup-" + tokenNumber
+        });
+      }
+    } catch (error) {
+      notifyHelp.textContent = "Could not enable notifications. Check your browser permissions.";
+    }
+  });
+
+  function notifyTurn(data) {
+    if (notificationPermission !== "granted" || !document.hidden) return;
+    const counterText = data.counter ? " at " + data.counter : "";
+    new Notification("It's your turn – CampusQ", {
+      body: "Token " + tokenNumber + " has been called" + counterText + ". Please proceed to the service counter.",
+      tag: "campusq-turn-" + tokenNumber,
+      requireInteraction: true
+    });
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, character => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[character]);
+  }
+
+  function renderStatus(data) {
+    statusEl.textContent = data.status;
+    statusEl.className = "badge " + (
+      data.status_code === "SERVING" ? "text-bg-success" :
+      data.status_code === "COMPLETED" ? "text-bg-secondary" :
+      data.status_code === "SKIPPED" ? "text-bg-warning" :
+      data.status_code === "CANCELLED" ? "text-bg-secondary" : "text-bg-info"
+    );
+
+    if (data.status_code === "SERVING") {
+      infoEl.innerHTML = '<h2 class="h3">It\'s your turn!</h2>' +
+        (data.counter ? '<p class="mt-2">Please proceed to <strong>' + escapeHtml(data.counter) + '</strong>.</p>' : '');
+    } else if (data.status_code === "WAITING") {
+      infoEl.innerHTML =
+        '<p class="text-secondary mt-3 mb-1">Your position in the waiting queue</p>' +
+        '<div class="display-4 fw-bold">' + (data.position ?? "—") + '</div>' +
+        '<p class="mt-3">Estimated wait: <strong>' + data.waiting_minutes + ' minutes</strong></p>';
+    } else {
+      infoEl.textContent = "This token is " + data.status.toLowerCase() + ".";
+    }
+  }
+
+  async function refreshQueue() {
+    try {
+      const response = await fetch(endpoint, {
+        headers: {"X-Requested-With": "XMLHttpRequest"},
+        cache: "no-store"
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      renderStatus(data);
+      if (previousStatus === "WAITING" && data.status_code === "SERVING") {
+        notifyTurn(data);
+      }
+      previousStatus = data.status_code;
+      updatedEl.textContent = data.updated_at;
+    } catch (error) {
+      updatedEl.textContent = "reconnecting...";
+    }
+  }
+
+  updateNotificationControls();
+  refreshQueue();
+  window.setInterval(refreshQueue, 5000);
+})();
+</script>
+{% endblock %}

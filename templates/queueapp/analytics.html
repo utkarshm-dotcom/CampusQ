@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}CampusQ | Analytics{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+  <div><div class="small text-uppercase text-info">CampusQ • Insights</div><h1 class="h2 mb-1">Analytics Dashboard</h1>
+  <p class="text-secondary mb-0">Last 7 days · {{ start_date|date:"d M Y" }} – {{ today|date:"d M Y" }}</p></div>
+  <a href="{% url 'admin_dashboard' %}" <div class="d-flex gap-2"><a href="{% url 'reports_center' %}" class="btn btn-primary">Reports & Export</a><a href="{% url 'admin_dashboard' %}" class="btn btn-outline-light">← Back to Admin</a></div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg"><div class="card p-3 h-100"><div class="text-secondary">Total tokens</div><div class="display-6 fw-bold">{{ totals.total }}</div></div></div>
+  <div class="col-6 col-lg"><div class="card p-3 h-100"><div class="text-secondary">Waiting</div><div class="display-6 fw-bold">{{ totals.waiting }}</div></div></div>
+  <div class="col-6 col-lg"><div class="card p-3 h-100"><div class="text-secondary">Serving</div><div class="display-6 fw-bold">{{ totals.serving }}</div></div></div>
+  <div class="col-6 col-lg"><div class="card p-3 h-100"><div class="text-secondary">Completed</div><div class="display-6 fw-bold">{{ totals.completed }}</div></div></div>
+  <div class="col-6 col-lg"><div class="card p-3 h-100"><div class="text-secondary">Skipped</div><div class="display-6 fw-bold">{{ totals.skipped }}</div></div></div>
+  <div class="col-6 col-lg"><div class="card p-3 h-100"><div class="text-secondary">Cancelled</div><div class="display-6 fw-bold">{{ totals.cancelled }}</div></div></div>
+  <div class="col-6 col-lg"><div class="card p-3 h-100"><div class="text-secondary">Avg. wait before call</div><div class="display-6 fw-bold">{{ avg_wait_minutes }}<span class="fs-6"> min</span></div></div></div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-lg-7"><div class="card p-4 h-100">
+    <h2 class="h5 mb-1">Daily token volume</h2><p class="small text-secondary">Tokens generated each day</p>
+    <div class="d-flex align-items-end gap-3" style="height:220px;border-bottom:1px solid #34435c;padding-top:15px">
+      {% for day in daily_rows %}<div class="flex-fill d-flex flex-column align-items-center justify-content-end h-100">
+        <div class="small text-secondary mb-1">{{ day.total }}</div>
+        <div style="width:100%;max-width:48px;height:{{ day.height }}%;min-height:{% if day.total %}5{% else %}0{% endif %}px;background:linear-gradient(180deg,#22d3ee,#7c3aed);border-radius:8px 8px 0 0"></div>
+        <div class="small text-secondary mt-2">{{ day.label }}</div>
+      </div>{% endfor %}
+    </div>
+  </div></div>
+  <div class="col-lg-5"><div class="card p-4 h-100">
+    <h2 class="h5 mb-1">Department performance</h2><p class="small text-secondary">Token volume by service</p>
+    {% for row in service_rows %}<div class="mb-3">
+      <div class="d-flex justify-content-between small mb-1"><span>{{ row.service__name }}</span><strong>{{ row.total }}</strong></div>
+      <div class="rounded-pill" style="height:9px;background:#263247;overflow:hidden"><div style="height:100%;width:{{ row.percent }}%;background:linear-gradient(90deg,#7c3aed,#22d3ee);border-radius:99px"></div></div>
+      <div class="small text-secondary mt-1">{{ row.completed }} completed · {{ row.waiting }} waiting · {{ row.skipped }} skipped · {{ row.cancelled }} cancelled</div>
+    </div>{% empty %}<p class="text-secondary">No token activity in this period yet.</p>{% endfor %}
+  </div></div>
+</div>
+
+<div class="card p-4 mb-4">
+  <h2 class="h5">Counter performance</h2><p class="small text-secondary">Tokens assigned to counters during the selected seven-day period</p>
+  <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Department</th><th>Counter</th><th>Assigned</th><th>Completed</th><th>Serving</th></tr></thead><tbody>
+  {% for row in counter_rows %}<tr><td>{{ row.service__name }}</td><td>{{ row.counter__name }}</td><td>{{ row.assigned }}</td><td>{{ row.completed }}</td><td>{{ row.serving }}</td></tr>
+  {% empty %}<tr><td colspan="5" class="text-secondary text-center py-4">No counter assignments in this period yet.</td></tr>{% endfor %}
+  </tbody></table></div>
+</div>
+<div class="small text-secondary">Average wait is calculated from token creation to first call for tokens that have a called-at timestamp. Statistics cover the last seven calendar days, including today.</div>
+{% endblock %}

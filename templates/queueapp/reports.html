@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}CampusQ | Reports & Export{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+  <div><div class="small text-uppercase text-info">CampusQ • Reports</div><h1 class="h2 mb-1">Reports & Export Centre</h1>
+  <p class="text-secondary mb-0">Filter queue records and export a report for your selected period.</p></div>
+  <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-light">← Back to Admin</a>
+</div>
+<div class="card p-4 mb-4">
+  <form method="get" class="row g-3 align-items-end">
+    <div class="col-md-3"><label class="form-label" for="start">Start date</label><input class="form-control" type="date" id="start" name="start" value="{{ start }}" required></div>
+    <div class="col-md-3"><label class="form-label" for="end">End date</label><input class="form-control" type="date" id="end" name="end" value="{{ end }}" required></div>
+    <div class="col-md-4"><label class="form-label" for="service">Department</label><select class="form-select" id="service" name="service"><option value="">All departments</option>{% for service in services %}<option value="{{ service.id }}" {% if selected_service == service.id|stringformat:"s" %}selected{% endif %}>{{ service.name }}</option>{% endfor %}</select></div>
+    <div class="col-md-2"><button class="btn btn-outline-light w-100">Apply filters</button></div>
+  </form>
+</div>
+<div class="card p-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div><h2 class="h5 mb-1">Export your report</h2><p class="text-secondary small mb-0">{{ record_count }} token records match these filters.</p></div>
+    <span class="badge text-bg-info">Admin only</span>
+  </div>
+  <div class="row g-3">
+    <div class="col-md-4"><a class="btn btn-outline-light w-100 py-3" href="?start={{ start }}&end={{ end }}&service={{ selected_service }}&format=csv"><strong>Download CSV</strong><div class="small text-secondary">Opens in spreadsheet apps</div></a></div>
+    <div class="col-md-4"><a class="btn btn-outline-light w-100 py-3" href="?start={{ start }}&end={{ end }}&service={{ selected_service }}&format=xlsx"><strong>Download Excel</strong><div class="small text-secondary">Formatted .xlsx workbook</div></a></div>
+    <div class="col-md-4"><a class="btn btn-primary w-100 py-3" href="?start={{ start }}&end={{ end }}&service={{ selected_service }}&format=pdf"><strong>Download PDF</strong><div class="small">Printable landscape report</div></a></div>
+  </div>
+</div>
+<div class="small text-secondary mt-3">Reports include token date, token number, student username, department, counter, status, created time, called time and completed time. Only staff users can access exports.</div>
+{% endblock %}

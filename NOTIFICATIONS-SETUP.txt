@@ -1,0 +1,16 @@
+CampusQ 7.0 – Browser Notifications
+
+Installation
+1. Extract this ZIP into your existing ~/Projects/CampusQ folder and choose overwrite/replace.
+2. Activate your existing virtual environment.
+3. Restart Django: python manage.py runserver
+4. Log in as a student and open one of your WAITING token tracking pages.
+5. Click “Enable browser notifications” and allow notifications in the browser prompt.
+6. Keep the token tracking page open. When staff calls that token, the page polls the authenticated status endpoint every 5 seconds and shows a browser notification if the tab is in the background.
+
+No database migration or new Python package is required.
+
+Limitations
+- This is browser notification while the tracking page is open (foreground/background tab). It is not a push notification when the browser is fully closed.
+- Browser permission is required. localhost is treated as a secure context by modern browsers.
+- The notification is triggered when the observed status changes from WAITING to SERVING.
